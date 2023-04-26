@@ -200,6 +200,7 @@ def main():
     # Check if the app can serve a new user
     if can_serve_user():
         st.title('Dose Volume Histogram Plotter')
+        st.write("<style>div.row-widget.stRadio > div{flex-direction:row;}</style>", unsafe_allow_html=True)
         
         if 'available_data' not in st.session_state:
             st.session_state['available_data'] = False
@@ -207,6 +208,8 @@ def main():
             st.session_state['fig'] = None
         if 'data' not in st.session_state:
             st.session_state['data'] = None
+        if 'data_all' not in st.session_state:
+            st.session_state['data_all'] = None
             
         # Load data
         rtdose_file = st.file_uploader('Upload RTDOSE file', type=['dcm'])
@@ -218,10 +221,12 @@ def main():
                 # Check if a previous temporary file exists
                     if 'rtdose_tempfile' in st.session_state:
                         # Delete the previous temporary file
-                        os.remove(st.session_state['rtdose_tempfile'].name)
+                        if os.path.isfile(st.session_state['rtdose_tempfile'].name):
+                            os.remove(st.session_state['rtdose_tempfile'].name)
                     if 'rtstruct_tempfile' in st.session_state:
                         # Delete the previous temporary file
-                        os.remove(st.session_state['rtstruct_tempfile'].name)
+                        if os.path.isfile(st.session_state['rtstruct_tempfile'].name):
+                            os.remove(st.session_state['rtstruct_tempfile'].name)
                         
                     # Create a new temporary file with a unique name
                     with tempfile.NamedTemporaryFile(suffix='.dcm', delete=False) as rtdose_tempfile:
@@ -265,6 +270,7 @@ def main():
                     # Generate the calculated DVHs
                     calcdvhs = {}
                     data = {}
+                    data_all = {}
                     
                     data['ROI'] = []
                     data['mindose'] = []
@@ -298,6 +304,11 @@ def main():
                                      }
                                     )
 
+                                data_all[structure['name']] = {
+                                    'dose': calcdvhs[key].bins[1:],
+                                    'volper': calcdvhs[key].counts * 100 / calcdvhs[key].counts[0],
+                                    'vol': calcdvhs[key].counts,
+                                }
                                 # Calculate statistics
                                 data['ROI'].append(structure['name'])
                                 data['mindose'].append(df['dose'].min())
@@ -317,15 +328,22 @@ def main():
 
                     st.session_state['fig'] = fig
                     st.session_state['data'] = data
+                    st.session_state['data_all'] = data_all
                     
             if st.session_state['fig'] is not None and st.session_state['data'] is not None:
                 st.write(st.session_state['fig'])
                 csv = pd.DataFrame(st.session_state['data'])
+                csv2 = pd.DataFrame(st.session_state['data_all'])
                 @st.cache_data
                 def convert_df(df):
                    return df.to_csv(index=False).encode('utf-8')
                 csv = convert_df(csv)
-                st.download_button("Download DVH", csv, r'test.csv', key='download-csv')
+                csv2 = convert_df(csv2)
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.download_button("Download Selected DVH Data", csv, r'test.csv', key='download-dvh')
+                with col2:
+                    st.download_button("Download All DVH Data", csv2, r'test.csv', key='download-dvh-all')
     else:
         # If Multiple user use the app and the resources are not enough
         st.write("Sorry, the app is currently overloaded. Please try again later.")

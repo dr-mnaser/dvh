@@ -340,23 +340,23 @@ def main():
                 def convert_df(df):
                    return df.to_csv(index=False).encode('utf-8')
                
-                @st.cache_data
-                def convert_df2(df):
-                   np.save("dvh_data.npy", df)
+                # @st.cache_data
+                # def convert_df2(df):
+                #    np.save("dvh_data.npy", df)
                    
                 csv = convert_df(csv)
-                convert_df2(st.session_state['data_all'])
+                #convert_df2(st.session_state['data_all'])
                 #csv2 = convert_df(csv2)
-                col1, col2, col3 = st.columns(3)
+                col1, col2 = st.columns(2)
                 with col1:
-                    st.download_button("Download DVH [CSV]", csv, r'test.csv', key='download-dvh')
-                with col2:
-                    with open("dvh_data.npy", "rb") as f:
-                        bytes_data = f.read()
-                    #st.download_button("Download All DVH Data", csv2, r'test.csv', key='download-dvh-all')
-                    st.download_button("Download DVH [Numpy]", data=bytes_data, file_name="dvh_data.npy", key='download-dvh-all')
+                    st.download_button("Download DVH [CSV]", csv, r'dvh.csv', key='download-dvh')
+                # with col2:
+                #     with open("dvh_data.npy", "rb") as f:
+                #         bytes_data = f.read()
+                #     #st.download_button("Download All DVH Data", csv2, r'test.csv', key='download-dvh-all')
+                #     st.download_button("Download DVH [Numpy]", data=bytes_data, file_name="dvh_data.npy", key='download-dvh-all')
                     
-                with col3:
+                with col2:
                     # Download button
                     #if st.button("Download DVH [JSON]"):
                     # Convert dictionary to JSON string
@@ -376,7 +376,7 @@ def main():
                     st.download_button(
                         label="Download DVH [JSON]",
                         data=data_json,
-                        file_name='dvh_data.json',
+                        file_name='dvh.json',
                         mime='application/json'
                     )
     

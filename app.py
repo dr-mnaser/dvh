@@ -30,6 +30,8 @@ import streamlit as st
 import tempfile
 import pandas as pd
 import psutil
+import json
+import base64
 
 logger = logging.getLogger('dicompylercore.dvhcalc')
 
@@ -333,17 +335,67 @@ def main():
             if st.session_state['fig'] is not None and st.session_state['data'] is not None:
                 st.write(st.session_state['fig'])
                 csv = pd.DataFrame(st.session_state['data'])
-                csv2 = pd.DataFrame(st.session_state['data_all'])
+                #csv2 = pd.DataFrame(st.session_state['data_all'])
                 @st.cache_data
                 def convert_df(df):
                    return df.to_csv(index=False).encode('utf-8')
+               
+                @st.cache_data
+                def convert_df2(df):
+                   np.save("dvh_data.npy", df)
+                   
                 csv = convert_df(csv)
-                csv2 = convert_df(csv2)
-                col1, col2 = st.columns(2)
+                convert_df2(st.session_state['data_all'])
+                #csv2 = convert_df(csv2)
+                col1, col2, col3 = st.columns(3)
                 with col1:
-                    st.download_button("Download Selected DVH Data", csv, r'test.csv', key='download-dvh')
+                    st.download_button("Download DVH [CSV]", csv, r'test.csv', key='download-dvh')
                 with col2:
-                    st.download_button("Download All DVH Data", csv2, r'test.csv', key='download-dvh-all')
+                    with open("dvh_data.npy", "rb") as f:
+                        bytes_data = f.read()
+                    #st.download_button("Download All DVH Data", csv2, r'test.csv', key='download-dvh-all')
+                    st.download_button("Download DVH [Numpy]", data=bytes_data, file_name="dvh_data.npy", key='download-dvh-all')
+                    
+                with col3:
+                    # Download button
+                    #if st.button("Download DVH [JSON]"):
+                    # Convert dictionary to JSON string
+                    data_all = st.session_state['data_all']
+                    data_all_list = {}
+                    for key, value in data_all.items():
+                        data_all_list[key] = {
+                            'dose': value['dose'].tolist(),
+                            'volper': value['volper'].tolist(),
+                            'vol': value['vol'].tolist()
+                        }
+                    data_json = json.dumps(data_all_list, indent=4)
+                    # with open('dvh_data.json', 'w') as f:
+                    #     f.write(data_json)
+                    
+                    # Download as a file using st.download_button
+                    st.download_button(
+                        label="Download DVH [JSON]",
+                        data=data_json,
+                        file_name='dvh_data.json',
+                        mime='application/json'
+                    )
+    
+                        # # Convert dictionary to JSON string
+                        # data_all = st.session_state['data_all']
+                        # data_all_list = {}
+                        # for key, value in data_all.items():
+                        #     data_all_list[key] = {
+                        #         'dose': value['dose'].tolist(),
+                        #         'volper': value['volper'].tolist(),
+                        #         'vol': value['vol'].tolist()
+                        #     }
+                        # data_json = json.dumps(data_all_list, indent=4)
+                        # with open('dvh_data.json', 'w') as f:
+                        #     f.write(data_json)
+                        
+                        # # Download as a file
+                        # href = f'<a href="data:application/json;base64,{base64.b64encode(data_json.encode()).decode()}" download="data.json">Download JSON</a>'
+                        # st.markdown(href, unsafe_allow_html=True)
     else:
         # If Multiple user use the app and the resources are not enough
         st.write("Sorry, the app is currently overloaded. Please try again later.")

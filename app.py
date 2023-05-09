@@ -31,7 +31,7 @@ import tempfile
 import pandas as pd
 import psutil
 import json
-import base64
+from io import BytesIO
 
 logger = logging.getLogger('dicompylercore.dvhcalc')
 
@@ -212,6 +212,8 @@ def main():
             st.session_state['data'] = None
         if 'data_all' not in st.session_state:
             st.session_state['data_all'] = None
+        if 'buf' not in st.session_state:
+            st.session_state['buf'] = None
             
         # Load data
         rtdose_file = st.file_uploader('Upload RTDOSE file', type=['dcm'])
@@ -332,35 +334,23 @@ def main():
                     st.session_state['data'] = data
                     st.session_state['data_all'] = data_all
                     
+                    #fig.set_dpi(300)
+                    #fig.set_size_inches(8, 6)
+                    buf = BytesIO()
+                    fig.savefig(buf, format='png', bbox_inches='tight')
+                    buf.seek(0)
+                    st.session_state['buf'] = buf
+                    
             if st.session_state['fig'] is not None and st.session_state['data'] is not None:
                 st.write(st.session_state['fig'])
                 csv = pd.DataFrame(st.session_state['data'])
-                #csv2 = pd.DataFrame(st.session_state['data_all'])
+
                 @st.cache_data
                 def convert_df(df):
                    return df.to_csv(index=False).encode('utf-8')
                
-                # @st.cache_data
-                # def convert_df2(df):
-                #    np.save("dvh_data.npy", df)
-                   
-                csv = convert_df(csv)
-                #convert_df2(st.session_state['data_all'])
-                #csv2 = convert_df(csv2)
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.download_button("Download DVH [CSV]", csv, r'dvh.csv', key='download-dvh')
-                # with col2:
-                #     with open("dvh_data.npy", "rb") as f:
-                #         bytes_data = f.read()
-                #     #st.download_button("Download All DVH Data", csv2, r'test.csv', key='download-dvh-all')
-                #     st.download_button("Download DVH [Numpy]", data=bytes_data, file_name="dvh_data.npy", key='download-dvh-all')
-                    
-                with col2:
-                    # Download button
-                    #if st.button("Download DVH [JSON]"):
-                    # Convert dictionary to JSON string
-                    data_all = st.session_state['data_all']
+                @st.cache_data
+                def convert_json(data_all):
                     data_all_list = {}
                     for key, value in data_all.items():
                         data_all_list[key] = {
@@ -369,9 +359,16 @@ def main():
                             'vol': value['vol'].tolist()
                         }
                     data_json = json.dumps(data_all_list, indent=4)
-                    # with open('dvh_data.json', 'w') as f:
-                    #     f.write(data_json)
-                    
+                    return data_json
+                   
+                csv = convert_df(csv)
+                data_json = convert_json(st.session_state['data_all'])
+
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.download_button("Download DVH [CSV]", csv, r'dvh.csv', key='download-dvh')
+
+                with col2:
                     # Download as a file using st.download_button
                     st.download_button(
                         label="Download DVH [JSON]",
@@ -379,23 +376,15 @@ def main():
                         file_name='dvh.json',
                         mime='application/json'
                     )
-    
-                        # # Convert dictionary to JSON string
-                        # data_all = st.session_state['data_all']
-                        # data_all_list = {}
-                        # for key, value in data_all.items():
-                        #     data_all_list[key] = {
-                        #         'dose': value['dose'].tolist(),
-                        #         'volper': value['volper'].tolist(),
-                        #         'vol': value['vol'].tolist()
-                        #     }
-                        # data_json = json.dumps(data_all_list, indent=4)
-                        # with open('dvh_data.json', 'w') as f:
-                        #     f.write(data_json)
-                        
-                        # # Download as a file
-                        # href = f'<a href="data:application/json;base64,{base64.b64encode(data_json.encode()).decode()}" download="data.json">Download JSON</a>'
-                        # st.markdown(href, unsafe_allow_html=True)
+                with col3:
+                    # Download the PNG file
+                    st.download_button(
+                        label='Download DVH [PNG]',
+                        data=st.session_state['buf'],
+                        file_name='plot.png',
+                        mime='image/png'
+                        )
+
     else:
         # If Multiple user use the app and the resources are not enough
         st.write("Sorry, the app is currently overloaded. Please try again later.")

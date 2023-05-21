@@ -304,20 +304,30 @@ def main():
                                 
                                 df = pd.DataFrame(
                                     {'dose': calcdvhs[key].bins[1:],
-                                     'volume_percentage': calcdvhs[key].counts * 100 / calcdvhs[key].counts[0]
+                                     'volume_percentage': calcdvhs[key].counts * 100 / calcdvhs[key].counts[0],
+                                     'volume': calcdvhs[key].counts,
                                      }
                                     )
 
-                                data_all[structure['name']] = {
-                                    'dose': calcdvhs[key].bins[1:],
-                                    'volper': calcdvhs[key].counts * 100 / calcdvhs[key].counts[0],
-                                    'vol': calcdvhs[key].counts,
-                                }
                                 # Calculate statistics
                                 data['ROI'].append(structure['name'])
                                 data['mindose'].append(df['dose'].min())
                                 data['maxdose'].append(df['dose'].max())
-                                data['meandose'].append(df['dose'].mean())
+                                dose_bins = list(df['dose'])  # List of dose values
+                                volume_bins = list(df['volume'])  # List of corresponding volume/frequency/bin values
+                                cumulative_volume = np.cumsum(volume_bins)  # Calculate cumulative volume
+                                mean_dose = np.trapz(dose_bins, cumulative_volume) / cumulative_volume[-1]
+                                #data['meandose'].append(df['dose'].mean())
+                                data['meandose'].append(mean_dose)
+                                
+                                data_all[structure['name']] = {
+                                    'dose': calcdvhs[key].bins[1:],
+                                    'volper': calcdvhs[key].counts * 100 / calcdvhs[key].counts[0],
+                                    'vol': calcdvhs[key].counts,
+                                    'mindose': df['dose'].min(),
+                                    'maxdose': df['dose'].max(),
+                                    'meandose': mean_dose,
+                                }
                                 
                                 for vol, vol_str in zip(vol_numbers, vol_numbers_str):
                                     data[vol_str].append(df[df['volume_percentage'] >= vol]['dose'].max())

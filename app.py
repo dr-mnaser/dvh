@@ -33,6 +33,7 @@ import psutil
 import json
 from io import BytesIO
 
+
 logger = logging.getLogger('dicompylercore.dvhcalc')
 
 def get_system_usage():
@@ -210,6 +211,8 @@ def main():
             st.session_state['fig'] = None
         if 'data' not in st.session_state:
             st.session_state['data'] = None
+        if 'data_fine' not in st.session_state:
+            st.session_state['data_fine'] = None
         if 'data_all' not in st.session_state:
             st.session_state['data_all'] = None
         if 'buf' not in st.session_state:
@@ -274,6 +277,7 @@ def main():
                     # Generate the calculated DVHs
                     calcdvhs = {}
                     data = {}
+                    data_fine = {}
                     data_all = {}
                     
                     data['ROI'] = []
@@ -281,15 +285,33 @@ def main():
                     data['maxdose'] = []
                     data['meandose'] = []
                     
+                    data_fine['ROI'] = []
+                    data_fine['mindose'] = []
+                    data_fine['maxdose'] = []
+                    data_fine['meandose'] = []
+                    
                     vol_numbers = list(range(5, 75, 5)) 
-                    dose_numbers = [2] + list(range(5, 100, 5)) + [97, 98, 99] 
+                    dose_numbers = [0.5, 1, 2] + list(range(5, 100, 5)) + [97, 98, 99, 99.5] 
                     vol_numbers_str = ['V'+str(vol) for vol in vol_numbers] # turn into V5 etc.
                     dose_numbers_str = ['D'+str(d) for d in dose_numbers]
+                    
+                    # vol_numbers_fine = [x / 100 for x in range(500, 7001, 1)]
+                    # dose_numbers_fine = [x / 100 for x in range(50, 9951, 1)]
+                    vol_numbers_fine = [x / 100 for x in range(500, 7002, 2)]
+                    dose_numbers_fine = [x / 100 for x in range(50, 9952, 2)]
+                    vol_numbers_str_fine = ['V'+str(vol) for vol in vol_numbers_fine] # turn into V5 etc.
+                    dose_numbers_str_fine = ['D'+str(d) for d in dose_numbers_fine]
+
                     
                     for vol in vol_numbers_str:
                         data[vol] = []
                     for dose in dose_numbers_str:
                         data[dose] = []
+                        
+                    for vol in vol_numbers_str_fine:
+                        data_fine[vol] = []
+                    for dose in dose_numbers_str_fine:
+                        data_fine[dose] = []
                     
                     fig, ax = plt.subplots()
                     for key, structure in RTstructures.items():
@@ -311,28 +333,66 @@ def main():
 
                                 # Calculate statistics
                                 data['ROI'].append(structure['name'])
-                                data['mindose'].append(df['dose'].min())
                                 data['maxdose'].append(df['dose'].max())
-                                dose_bins = list(df['dose'])  # List of dose values
-                                volume_bins = list(df['volume'])  # List of corresponding volume/frequency/bin values
-                                cumulative_volume = np.cumsum(volume_bins)  # Calculate cumulative volume
+                                
+                                data_fine['ROI'].append(structure['name'])
+                                data_fine['maxdose'].append(df['dose'].max())
+                                
+                                dose_bins = np.array(list(df['dose']), dtype=np.float64)  # List of dose values
+                                volume_bins = np.array(list(df['volume']), dtype=np.float64)  # List of corresponding volume/frequency/bin values
+                                volume_percentage_bins = np.array(list(df['volume_percentage']), dtype=np.float64)
+
+                                index = volume_percentage_bins <= dose_numbers[-1]
+                                
+                                dose_bins = dose_bins[index]
+                                volume_bins = volume_bins[index]
+                                
+                                data['mindose'].append(dose_bins.min())
+                                data_fine['mindose'].append(dose_bins.min())
+                                
+                                cumulative_volume = np.cumsum(volume_bins, dtype=np.float64)  # Calculate cumulative volume
+                                
                                 mean_dose = np.trapz(dose_bins, cumulative_volume) / cumulative_volume[-1]
-                                #data['meandose'].append(df['dose'].mean())
-                                data['meandose'].append(mean_dose)
+                                data['meandose'].append(np.round(mean_dose, 2))
+                                data_fine['meandose'].append(np.round(mean_dose, 2))
+                                                               
+                                for vol, vol_str in zip(vol_numbers, vol_numbers_str):
+                                    index = np.array(list(df['dose'])) >= vol
+                                    if np.sum(index) > 0:
+                                        data[vol_str].append(np.round(df[index]['volume_percentage'].max(), 2))
+                                    else:
+                                        data[vol_str].append(0)
+
+                                for dose, dose_str in zip(dose_numbers, dose_numbers_str):
+                                    index = df['volume_percentage'] <= dose
+                                    if np.sum(index) > 0:
+                                        data[dose_str].append(np.round(df[index]['dose'].min(), 2))
+                                    else:
+                                        data[dose_str].append(100)
+                                        
+                                for vol, vol_str in zip(vol_numbers_fine, vol_numbers_str_fine):
+                                    index = np.array(list(df['dose'])) >= vol
+                                    if np.sum(index) > 0:
+                                        data_fine[vol_str].append(np.round(df[index]['volume_percentage'].max(), 2))
+                                    else:
+                                        data_fine[vol_str].append(0)
+
+                                for dose, dose_str in zip(dose_numbers_fine, dose_numbers_str_fine):
+                                    index = df['volume_percentage'] <= dose
+                                    if np.sum(index) > 0:
+                                        data_fine[dose_str].append(np.round(df[index]['dose'].min(), 2))
+                                    else:
+                                        data_fine[dose_str].append(100)
+
                                 
                                 data_all[structure['name']] = {
                                     'dose': calcdvhs[key].bins[1:],
                                     'volper': calcdvhs[key].counts * 100 / calcdvhs[key].counts[0],
                                     'vol': calcdvhs[key].counts,
-                                    'mindose': df['dose'].min(),
+                                    'mindose': dose_bins.min(),
                                     'maxdose': df['dose'].max(),
                                     'meandose': mean_dose,
                                 }
-                                
-                                for vol, vol_str in zip(vol_numbers, vol_numbers_str):
-                                    data[vol_str].append(df[df['volume_percentage'] >= vol]['dose'].max())
-                                for dose, dose_str in zip(dose_numbers, dose_numbers_str):
-                                    data[dose_str].append(df[df['volume_percentage'] <= dose]['dose'].min())
           
                             ax.set_title('DVH curves')
                             ax.set_ylabel('Dose (Gy)')
@@ -342,10 +402,9 @@ def main():
 
                     st.session_state['fig'] = fig
                     st.session_state['data'] = data
+                    st.session_state['data_fine'] = data_fine
                     st.session_state['data_all'] = data_all
                     
-                    #fig.set_dpi(300)
-                    #fig.set_size_inches(8, 6)
                     buf = BytesIO()
                     fig.savefig(buf, format='png', bbox_inches='tight')
                     buf.seek(0)
@@ -354,11 +413,12 @@ def main():
             if st.session_state['fig'] is not None and st.session_state['data'] is not None:
                 st.write(st.session_state['fig'])
                 csv = pd.DataFrame(st.session_state['data'])
+                csv_fine = pd.DataFrame(st.session_state['data_fine'])
 
                 @st.cache_data
                 def convert_df(df):
                    return df.to_csv(index=False).encode('utf-8')
-               
+
                 @st.cache_data
                 def convert_json(data_all):
                     data_all_list = {}
@@ -372,24 +432,31 @@ def main():
                     return data_json
                    
                 csv = convert_df(csv)
+                csv_fine = convert_df(csv_fine)
                 data_json = convert_json(st.session_state['data_all'])
 
-                col1, col2, col3 = st.columns(3)
+                st.markdown('---')
+                st.subheader('Download DVH')
+
+                col1, col2, col3, col4 = st.columns(4)
                 with col1:
-                    st.download_button("Download DVH [CSV]", csv, r'dvh.csv', key='download-dvh')
+                    st.download_button("DVH Coarse [CSV]", csv, r'dvh.csv', key='download-dvh')
 
                 with col2:
+                    st.download_button("DVH Refined [CSV]", csv_fine, r'dvh_refined.csv', key='download-dvh-refined')
+                    
+                with col3:
                     # Download as a file using st.download_button
                     st.download_button(
-                        label="Download DVH [JSON]",
+                        label="DVH Raw [JSON]",
                         data=data_json,
                         file_name='dvh.json',
                         mime='application/json'
                     )
-                with col3:
+                with col4:
                     # Download the PNG file
                     st.download_button(
-                        label='Download DVH [PNG]',
+                        label='DVH Image [PNG]',
                         data=st.session_state['buf'],
                         file_name='plot.png',
                         mime='image/png'

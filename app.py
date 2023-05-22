@@ -343,18 +343,20 @@ def main():
                                 volume_percentage_bins = np.array(list(df['volume_percentage']), dtype=np.float64)
 
                                 index = volume_percentage_bins <= dose_numbers[-1]
-                                
-                                dose_bins = dose_bins[index]
-                                volume_bins = volume_bins[index]
-                                
-                                data['mindose'].append(dose_bins.min())
-                                data_fine['mindose'].append(dose_bins.min())
-                                
-                                cumulative_volume = np.cumsum(volume_bins, dtype=np.float64)  # Calculate cumulative volume
-                                
-                                mean_dose = np.trapz(dose_bins, cumulative_volume) / cumulative_volume[-1]
-                                data['meandose'].append(np.round(mean_dose, 2))
-                                data_fine['meandose'].append(np.round(mean_dose, 2))
+                                if np.sum(index) > 0:
+                                    dose_bins = dose_bins[index]
+                                    volume_bins = volume_bins[index]
+                                    cumulative_volume = np.cumsum(volume_bins, dtype=np.float64)  # Calculate cumulative volume
+                                    mean_dose = np.trapz(dose_bins, cumulative_volume) / cumulative_volume[-1]
+                                    data['mindose'].append(dose_bins.min())       
+                                    data['meandose'].append(np.round(mean_dose, 2))
+                                    data_fine['mindose'].append(dose_bins.min())       
+                                    data_fine['meandose'].append(np.round(mean_dose, 2))
+                                else:
+                                    data['mindose'].append(dose_bins.min())       
+                                    data['meandose'].append(np.round(0.5 * (dose_bins.min() + df['dose'].max()), 2))
+                                    data_fine['mindose'].append(dose_bins.min())       
+                                    data_fine['meandose'].append(np.round(0.5 * (dose_bins.min() + df['dose'].max()), 2))
                                                                
                                 for vol, vol_str in zip(vol_numbers, vol_numbers_str):
                                     index = np.array(list(df['dose'])) >= vol

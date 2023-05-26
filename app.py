@@ -290,14 +290,14 @@ def main():
                     data_fine['maxdose'] = []
                     data_fine['meandose'] = []
                     
-                    vol_numbers = list(range(5, 75, 5)) 
-                    dose_numbers = [0.5, 1, 2] + list(range(5, 100, 5)) + [97, 98, 99, 99.5] 
+                    vol_numbers = list(range(5, 80, 5)) 
+                    dose_numbers = [0.5, 1, 2, 3] + list(range(5, 100, 5)) + [97, 98, 99, 99.5] 
                     vol_numbers_str = ['V'+str(vol) for vol in vol_numbers] # turn into V5 etc.
                     dose_numbers_str = ['D'+str(d) for d in dose_numbers]
                     
                     # vol_numbers_fine = [x / 100 for x in range(500, 7001, 1)]
                     # dose_numbers_fine = [x / 100 for x in range(50, 9951, 1)]
-                    vol_numbers_fine = [x / 100 for x in range(500, 7002, 2)]
+                    vol_numbers_fine = [x / 100 for x in range(500, 7502, 2)]
                     dose_numbers_fine = [x / 100 for x in range(50, 9952, 2)]
                     vol_numbers_str_fine = ['V'+str(vol) for vol in vol_numbers_fine] # turn into V5 etc.
                     dose_numbers_str_fine = ['D'+str(d) for d in dose_numbers_fine]
@@ -320,7 +320,11 @@ def main():
                             if (key in calcdvhs) and (len(calcdvhs[key].counts) and calcdvhs[key].counts[0]!=0):
                                 st.write('DVH found for ' + structure['name'])
                                 
-                                sns.lineplot(y=calcdvhs[key].bins[1:], x=calcdvhs[key].counts * 100 / calcdvhs[key].counts[0], 
+                                # sns.lineplot(y=calcdvhs[key].bins[1:], x=calcdvhs[key].counts * 100 / calcdvhs[key].counts[0], 
+                                #      color=dvhcalc.np.array(structure['color'], dtype=float) / 255, 
+                                #      label=structure['name'], linestyle='dashed', ax=ax)
+                                
+                                sns.lineplot(y=calcdvhs[key].counts * 100 / calcdvhs[key].counts[0], x=calcdvhs[key].bins[1:], 
                                      color=dvhcalc.np.array(structure['color'], dtype=float) / 255, 
                                      label=structure['name'], linestyle='dashed', ax=ax)
                                 
@@ -338,25 +342,32 @@ def main():
                                 data_fine['ROI'].append(structure['name'])
                                 data_fine['maxdose'].append(df['dose'].max())
                                 
-                                dose_bins = np.array(list(df['dose']), dtype=np.float64)  # List of dose values
-                                volume_bins = np.array(list(df['volume']), dtype=np.float64)  # List of corresponding volume/frequency/bin values
-                                volume_percentage_bins = np.array(list(df['volume_percentage']), dtype=np.float64)
+                                dose_bins = np.array(list(df['dose']))  # List of dose values
+                                delta_dose_bins = np.diff(np.array([0] + list(df['dose']))) 
+                                volume_bins = np.array(list(df['volume']))  # List of corresponding volume/frequency/bin values
+                                volume_percentage_bins = np.array(list(df['volume_percentage']))
 
+                                mean_dose = np.sum(delta_dose_bins * volume_percentage_bins) / np.max(volume_percentage_bins)
+                                data['meandose'].append(np.round(mean_dose, 2))
+                                data_fine['meandose'].append(np.round(mean_dose, 2))
+                                
                                 index = volume_percentage_bins <= dose_numbers[-1]
                                 if np.sum(index) > 0:
                                     dose_bins = dose_bins[index]
                                     volume_bins = volume_bins[index]
-                                    cumulative_volume = np.cumsum(volume_bins, dtype=np.float64)  # Calculate cumulative volume
-                                    mean_dose = np.trapz(dose_bins, cumulative_volume) / cumulative_volume[-1]
-                                    data['mindose'].append(dose_bins.min())       
-                                    data['meandose'].append(np.round(mean_dose, 2))
-                                    data_fine['mindose'].append(dose_bins.min())       
-                                    data_fine['meandose'].append(np.round(mean_dose, 2))
+                                    data['mindose'].append(dose_bins.min())
+                                    data_fine['mindose'].append(dose_bins.min())  
+                                    # cumulative_volume = np.cumsum(volume_bins, dtype=np.float64)  # Calculate cumulative volume
+                                    # mean_dose = np.trapz(dose_bins, cumulative_volume) / cumulative_volume[-1]
+                                    ## Calculate the mean dose
+                                    # mean_dose = np.average(dose_bins, weights=volume_bins)
+                                    # data['meandose'].append(np.round(mean_dose, 2))    
+                                    # data_fine['meandose'].append(np.round(mean_dose, 2))
                                 else:
                                     data['mindose'].append(dose_bins.min())       
-                                    data['meandose'].append(np.round(0.5 * (dose_bins.min() + df['dose'].max()), 2))
+                                    #data['meandose'].append(np.round(0.5 * (dose_bins.min() + df['dose'].max()), 2))
                                     data_fine['mindose'].append(dose_bins.min())       
-                                    data_fine['meandose'].append(np.round(0.5 * (dose_bins.min() + df['dose'].max()), 2))
+                                    #data_fine['meandose'].append(np.round(0.5 * (dose_bins.min() + df['dose'].max()), 2))
                                                                
                                 for vol, vol_str in zip(vol_numbers, vol_numbers_str):
                                     index = np.array(list(df['dose'])) >= vol
@@ -396,9 +407,14 @@ def main():
                                     'meandose': mean_dose,
                                 }
           
+                            # ax.set_title('DVH curves')
+                            # ax.set_ylabel('Dose (Gy)')
+                            # ax.set_xlabel('Volume (%)')
                             ax.set_title('DVH curves')
-                            ax.set_ylabel('Dose (Gy)')
-                            ax.set_xlabel('Volume (%)')
+                            ax.set_ylabel('Volume (%)')
+                            ax.set_xlabel('Dose (Gy)')
+                            # Add a light grid
+                            ax.grid(color='lightgray', linestyle='-', linewidth=0.5)
 
                             ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
 

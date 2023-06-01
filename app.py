@@ -345,14 +345,15 @@ def main():
                                 data_fine['meandose'].append(np.round(mean_dose, 2))
                                 
                                 index = volume_percentage_bins <= dose_numbers[-1]
-                                if np.sum(index) > 0:
-                                    dose_bins = dose_bins[index]
-                                    volume_bins = volume_bins[index]
-                                    data['mindose'].append(dose_bins.min())
-                                    data_fine['mindose'].append(dose_bins.min())  
+                                index_100 = df['volume_percentage'] == 100
+                                if np.sum(index_100) > 0:
+                                    mindose_value = df[index_100]['dose'].max()
+                                elif np.sum(index) > 0:
+                                    mindose_value = dose_bins[index].min()
                                 else:
-                                    data['mindose'].append(dose_bins.min())       
-                                    data_fine['mindose'].append(dose_bins.min())       
+                                    mindose_value = dose_bins.min()
+                                data['mindose'].append(mindose_value)  
+                                data_fine['mindose'].append(mindose_value)
          
                                 for vol, vol_str in zip(vol_numbers, vol_numbers_str):
                                     index = np.array(list(df['dose'])) >= vol
@@ -401,7 +402,7 @@ def main():
                                     'dose': calcdvhs[key].bins[1:],
                                     'volper': calcdvhs[key].counts * 100 / calcdvhs[key].counts[0],
                                     'vol': calcdvhs[key].counts,
-                                    'mindose': dose_bins.min(),
+                                    'mindose': mindose_value,
                                     'maxdose': df['dose'].max(),
                                     'meandose': mean_dose,
                                 }
